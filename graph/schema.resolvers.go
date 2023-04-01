@@ -7,18 +7,28 @@ package graph
 import (
 	"context"
 	"fmt"
+	"math/rand"
 
+	db "github.com/ghost-codes/uber/db/sqlc"
 	"github.com/ghost-codes/uber/graph/model"
 )
 
-// CreateTodo is the resolver for the createTodo field.
-func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error) {
-	panic(fmt.Errorf("not implemented: CreateTodo - createTodo"))
+// CreateUser is the resolver for the createUser field.
+func (r *mutationResolver) CreateUser(ctx context.Context, data model.CreateUserData) (*db.UserMetaData, error) {
+	args := db.CreateUserMetaDataParams{
+        ID: fmt.Sprintf("%d",rand.Intn(1000)),
+		DateOfBirth: data.DateOfBirth,
+		PhoneNumber: data.PhoneNumber,
+	}
+
+	metatData, err := r.Store.CreateUserMetaData(ctx, args)
+	return &metatData, err
 }
 
-// Todos is the resolver for the todos field.
-func (r *queryResolver) Todos(ctx context.Context) ([]*model.Todo, error) {
-	panic(fmt.Errorf("not implemented: Todos - todos"))
+// UserMetaData is the resolver for the userMetaData field.
+func (r *queryResolver) UserMetaData(ctx context.Context, id string) (*db.UserMetaData, error) {
+    userMetaData,err:=r.Store.FetchUserMetaDataByID(ctx,id);
+    return &userMetaData,err;
 }
 
 // Mutation returns MutationResolver implementation.

@@ -1,28 +1,23 @@
-# GraphQL schema example
-#
-# https://gqlgen.com/getting-started/
 
-type Todo {
-  id: ID!
-  text: String!
-  done: Boolean!
-  user: User!
+scalar Time
+
+type UserMetaData{
+    id: ID!
+    phoneNumber: String!
+    dateOfBirth: Time!
+    createdDate: Time!
 }
 
-type User {
-  id: ID!
-  name: String!
+
+input CreateUserData{ 
+    phoneNumber: String!
+    dateOfBirth: Time!
 }
 
-type Query {
-  todos: [Todo!]!
+type Mutation{
+     createUser(data: CreateUserData!): UserMetaData!
 }
 
-input NewTodo {
-  text: String!
-  userId: String!
-}
-
-type Mutation {
-  createTodo(input: NewTodo!): Todo!
+type Query{
+    userMetaData(id: ID!): UserMetaData!
 }

@@ -1,0 +1,73 @@
+version: "1"
+project:
+  id: "uber"
+
+# sql:
+#   - engine: "postgres"
+#     queries: "query.sql"
+#     schema: "schema.sql"
+#     gen:
+#       go:
+
+packages:
+  - name: "db"
+    path: "./db/sqlc"
+    queries: "./db/query/"
+    schema: "./db/migrations/"
+    engine: "postgresql"
+    emit_json_tags: true
+    emit_prepared_queries: false
+    emit_interface: false
+    emit_exact_table_names: true
+    emit_empty_slices: true
+
+overrides:
+  - db_type: "pg_catalog.timestamp"
+    go_type:
+      import: "time"
+      type: "Time"
+      pointer: true
+    nullable: true
+  - db_type: "timestamptz"
+    go_type:
+      import: "time"
+      type: "Time"
+      pointer: true
+    nullable: true
+
+  - db_type: "pg_catalog.int2"
+    go_type:
+      type: "int16"
+      pointer: true
+    nullable: true
+  - db_type: "pg_catalog.int4"
+    go_type:
+      type: "int"
+      pointer: true
+    nullable: true
+  - db_type: "pg_catalog.int8"
+    go_type:
+      type: "int64"
+      pointer: true
+    nullable: true
+  - db_type: "pg_catalog.bool"
+    go_type:
+      type: "bool"
+      pointer: true
+    nullable: true
+  - db_type: "pg_catalog.float4"
+    go_type:
+      type: "float32"
+      pointer: true
+    nullable: true
+  - db_type: "pg_catalog.float8"
+    go_type:
+      type: "float64"
+      pointer: true
+    nullable: true      
+  - db_type: "pg_catalog.varchar"
+    go_type:
+      type: "string"
+      pointer: true
+    nullable: true      
+
