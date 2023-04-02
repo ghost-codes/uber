@@ -5,6 +5,7 @@ import "github.com/spf13/viper"
 type Config struct{
     DBDriver string `mapstructure:"DB_DRIVER"`
     DBSource string `mapstructure:"DB_SOURCE"`
+    FirebaseConfigPath string `mapstructure:"FIREBASE_CONFIG_PATH"`
 }
 
 

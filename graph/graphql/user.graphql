@@ -1,0 +1,50 @@
+
+
+scalar Time
+
+type UserMetaData{
+    id: ID!
+    phoneNumber: String!
+    dateOfBirth: Time!
+    createdDate: Time!
+    rideHistory:[RideHistory!]!
+}
+
+type Location{
+    lat: Float!
+    long: Float!
+}
+
+type PaymentHistory{
+    id: ID!
+    amountCents: Int!
+    paymentMethod: String!
+    createdAt: Time!
+}
+
+type RideHistory{
+    id: ID!
+    source: Location!
+    destination: Location!
+    user: String!
+    payment_id: PaymentHistory!
+    driver: Driver!
+    boardTime: Time!
+    arrivalTime: Time
+    status: String
+}
+
+
+
+input CreateUserData{ 
+    phoneNumber: String!
+    dateOfBirth: Time!
+}
+
+type Mutation{
+     createUser(data: CreateUserData!): UserMetaData!
+}
+
+type Query{
+    userMetaData(id: ID!): UserMetaData!
+}

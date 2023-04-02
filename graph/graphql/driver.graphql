@@ -1,0 +1,18 @@
+type Driver{
+    id: ID!
+    name: String!
+    contact: String!
+    carNumber: String!
+    carBrand: String!
+    carColor: String!
+    profilePicture: String
+}
+
+
+extend type Mutation{
+     createDriver(data: CreateUserData!): Driver!
+}
+
+extend type Query{
+    fetchDriver(id: ID!): Driver!
+}
