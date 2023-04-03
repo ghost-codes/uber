@@ -1,4 +1,9 @@
+directive @auth(type:Type!) on FIELD_DEFINITION
 
+enum Type{
+    Client
+    Driver 
+}
 
 scalar Time
 
@@ -34,6 +39,10 @@ type RideHistory{
     status: String
 }
 
+type Session{
+    user: UserMetaData
+    isSigupComplete: Boolean!
+}
 
 
 input CreateUserData{ 
@@ -43,6 +52,7 @@ input CreateUserData{
 
 type Mutation{
      createUser(data: CreateUserData!): UserMetaData!
+     createSession(tokenId: String!): Session!
 }
 
 type Query{

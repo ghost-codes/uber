@@ -3,7 +3,12 @@
 package model
 
 import (
+	"fmt"
+	"io"
+	"strconv"
 	"time"
+
+	db "github.com/ghost-codes/uber/db/sqlc"
 )
 
 type CreateUserData struct {
@@ -14,4 +19,50 @@ type CreateUserData struct {
 type Location struct {
 	Lat  float64 `json:"lat"`
 	Long float64 `json:"long"`
+}
+
+type Session struct {
+	User            *db.UserMetaData `json:"user,omitempty"`
+	IsSigupComplete bool             `json:"isSigupComplete"`
+}
+
+type Type string
+
+const (
+	TypeClient Type = "Client"
+	TypeDriver Type = "Driver"
+)
+
+var AllType = []Type{
+	TypeClient,
+	TypeDriver,
+}
+
+func (e Type) IsValid() bool {
+	switch e {
+	case TypeClient, TypeDriver:
+		return true
+	}
+	return false
+}
+
+func (e Type) String() string {
+	return string(e)
+}
+
+func (e *Type) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = Type(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid Type", str)
+	}
+	return nil
+}
+
+func (e Type) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }

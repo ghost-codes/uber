@@ -6,6 +6,7 @@ package graph
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math/rand"
 
@@ -24,6 +25,43 @@ func (r *mutationResolver) CreateUser(ctx context.Context, data model.CreateUser
 
 	metatData, err := r.Store.CreateUserMetaData(ctx, args)
 	return &metatData, err
+}
+
+// CreateSession is the resolver for the createSession field.
+func (r *mutationResolver) CreateSession(ctx context.Context, tokenID string) (*model.Session, error) {
+	token, err := r.FirebaseAuth.VerifyIDToken(ctx, tokenID)
+	if err != nil {
+		return nil, err
+	}
+
+    user, err := r.Store.FetchUserMetaDataByID(ctx, token.UID)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return nil, err
+		}
+
+		session := model.Session{
+			IsSigupComplete: false,
+		}
+
+		return &session, nil
+	}
+
+	claims := map[string]interface{}{
+		"userType": model.TypeClient,
+	}
+
+	err = r.FirebaseAuth.SetCustomUserClaims(ctx, token.UID, claims)
+	if err != nil {
+		return nil, err
+	}
+
+	session := model.Session{
+		IsSigupComplete: true,
+		User:           &user,
+	}
+
+	return &session, nil
 }
 
 // UserMetaData is the resolver for the userMetaData field.

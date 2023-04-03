@@ -3,15 +3,17 @@ package main
 import (
 	"database/sql"
 	"log"
-	"net/http"
-	"os"
 
+	"firebase.google.com/go/auth"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
 	db "github.com/ghost-codes/uber/db/sqlc"
 	"github.com/ghost-codes/uber/graph"
+	directives "github.com/ghost-codes/uber/graph/directives"
 	resolver "github.com/ghost-codes/uber/graph/resolver"
+    "github.com/ghost-codes/uber/middleware"
 	"github.com/ghost-codes/uber/util"
+	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
 
@@ -33,20 +35,42 @@ func main() {
 	}
 
 	store := db.NewStore(conn)
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = defaultPort
-	}
 
-	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: &resolver.Resolver{
-		Store:  store,
-		Config: config,
+    router:= gin.Default()
+    router.Use(middleware.AuthMiddleware(*store))
+    
+    router.POST("/graphql",graphqlHandler(store,config,auth))
+    router.GET("/",playgroundHandler())
+
+	log.Printf("connect to http://localhost:8080/ for GraphQL playground")
+    router.Run()
+}
+
+func graphqlHandler(store *db.Store,config util.Config, auth *auth.Client) gin.HandlerFunc {
+	// NewExecutableSchema and Config are in the generated.go file
+	// Resolver is in the resolver.go file
+    
+    srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: &resolver.Resolver{
+        Store:  store,
+        Config: config,
         FirebaseAuth: auth,
-	}}))
+    },
+    Directives: graph.DirectiveRoot{
+        Auth: directives.UserAuthDirective,
+    },
+}))
 
-	http.Handle("/", playground.Handler("GraphQL playground", "/graphql"))
-	http.Handle("/graphql", srv)
 
-	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	return func(c *gin.Context) {
+	    srv.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+// Defining the Playground handler
+func playgroundHandler() gin.HandlerFunc {
+	h := playground.Handler("GraphQL", "/graphql")
+
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
 }
