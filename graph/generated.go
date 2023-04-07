@@ -4219,7 +4219,7 @@ func (ec *executionContext) unmarshalInputCreateUserData(ctx context.Context, ob
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"phoneNumber", "dateOfBirth"}
+	fieldsInOrder := [...]string{"phoneNumber", "dateOfBirth", "firebaseAuthId"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -4239,6 +4239,14 @@ func (ec *executionContext) unmarshalInputCreateUserData(ctx context.Context, ob
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("dateOfBirth"))
 			it.DateOfBirth, err = ec.unmarshalNTime2timeᚐTime(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "firebaseAuthId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("firebaseAuthId"))
+			it.FirebaseAuthID, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}

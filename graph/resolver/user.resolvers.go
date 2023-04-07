@@ -8,7 +8,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"math/rand"
 
 	db "github.com/ghost-codes/uber/db/sqlc"
 	"github.com/ghost-codes/uber/graph"
@@ -17,14 +16,33 @@ import (
 
 // CreateUser is the resolver for the createUser field.
 func (r *mutationResolver) CreateUser(ctx context.Context, data model.CreateUserData) (*db.UserMetaData, error) {
-	args := db.CreateUserMetaDataParams{
-		ID:          fmt.Sprintf("%d", rand.Intn(1000)),
+    token,err:= r.FirebaseAuth.VerifyIDToken(ctx,data.FirebaseAuthID);
+
+    if err!=nil{
+        return nil,err
+    }
+
+
+
+
+    args := db.CreateUserMetaDataParams{
+		ID:          token.UID,
 		DateOfBirth: data.DateOfBirth,
 		PhoneNumber: data.PhoneNumber,
 	}
 
 	metatData, err := r.Store.CreateUserMetaData(ctx, args)
-	return &metatData, err
+    if err !=nil{
+        return nil,err;
+    }
+
+    _,err=r.FirebaseAuth.CustomTokenWithClaims(ctx,metatData.ID,map[string]interface{}{"type": "client"})
+    if err!=nil{
+        return nil, err;
+    }
+
+
+	return &metatData, nil;
 }
 
 // CreateSession is the resolver for the createSession field.
@@ -34,7 +52,7 @@ func (r *mutationResolver) CreateSession(ctx context.Context, tokenID string) (*
 		return nil, err
 	}
 
-    user, err := r.Store.FetchUserMetaDataByID(ctx, token.UID)
+	user, err := r.Store.FetchUserMetaDataByID(ctx, token.UID)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return nil, err
@@ -58,7 +76,7 @@ func (r *mutationResolver) CreateSession(ctx context.Context, tokenID string) (*
 
 	session := model.Session{
 		IsSigupComplete: true,
-		User:           &user,
+		User:            &user,
 	}
 
 	return &session, nil

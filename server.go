@@ -37,7 +37,7 @@ func main() {
 	store := db.NewStore(conn)
 
     router:= gin.Default()
-    router.Use(middleware.AuthMiddleware(*store))
+    router.Use(middleware.AuthMiddleware(*store,auth))
     
     router.POST("/graphql",graphqlHandler(store,config,auth))
     router.GET("/",playgroundHandler())

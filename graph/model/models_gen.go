@@ -12,8 +12,9 @@ import (
 )
 
 type CreateUserData struct {
-	PhoneNumber string    `json:"phoneNumber"`
-	DateOfBirth time.Time `json:"dateOfBirth"`
+	PhoneNumber    string    `json:"phoneNumber"`
+	DateOfBirth    time.Time `json:"dateOfBirth"`
+	FirebaseAuthID string    `json:"firebaseAuthId"`
 }
 
 type Location struct {
