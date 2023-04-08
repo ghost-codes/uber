@@ -16,33 +16,29 @@ import (
 
 // CreateUser is the resolver for the createUser field.
 func (r *mutationResolver) CreateUser(ctx context.Context, data model.CreateUserData) (*db.UserMetaData, error) {
-    token,err:= r.FirebaseAuth.VerifyIDToken(ctx,data.FirebaseAuthID);
+	token, err := r.FirebaseAuth.VerifyIDToken(ctx, data.FirebaseAuthID)
 
-    if err!=nil{
-        return nil,err
-    }
+	if err != nil {
+		return nil, err
+	}
 
-
-
-
-    args := db.CreateUserMetaDataParams{
+	args := db.CreateUserMetaDataParams{
 		ID:          token.UID,
 		DateOfBirth: data.DateOfBirth,
 		PhoneNumber: data.PhoneNumber,
 	}
 
 	metatData, err := r.Store.CreateUserMetaData(ctx, args)
-    if err !=nil{
-        return nil,err;
-    }
+	if err != nil {
+		return nil, err
+	}
 
-    _,err=r.FirebaseAuth.CustomTokenWithClaims(ctx,metatData.ID,map[string]interface{}{"type": "client"})
-    if err!=nil{
-        return nil, err;
-    }
+	_, err = r.FirebaseAuth.CustomTokenWithClaims(ctx, metatData.ID, map[string]interface{}{"type": "client"})
+	if err != nil {
+		return nil, err
+	}
 
-
-	return &metatData, nil;
+	return &metatData, nil
 }
 
 // CreateSession is the resolver for the createSession field.
@@ -108,11 +104,6 @@ func (r *rideHistoryResolver) Driver(ctx context.Context, obj *db.RideHistory) (
 	panic(fmt.Errorf("not implemented: Driver - driver"))
 }
 
-// RideHistory is the resolver for the rideHistory field.
-func (r *userMetaDataResolver) RideHistory(ctx context.Context, obj *db.UserMetaData) ([]*db.RideHistory, error) {
-	panic(fmt.Errorf("not implemented: RideHistory - rideHistory"))
-}
-
 // Mutation returns graph.MutationResolver implementation.
 func (r *Resolver) Mutation() graph.MutationResolver { return &mutationResolver{r} }
 
@@ -122,10 +113,18 @@ func (r *Resolver) Query() graph.QueryResolver { return &queryResolver{r} }
 // RideHistory returns graph.RideHistoryResolver implementation.
 func (r *Resolver) RideHistory() graph.RideHistoryResolver { return &rideHistoryResolver{r} }
 
-// UserMetaData returns graph.UserMetaDataResolver implementation.
-func (r *Resolver) UserMetaData() graph.UserMetaDataResolver { return &userMetaDataResolver{r} }
-
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type rideHistoryResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *userMetaDataResolver) RideHistory(ctx context.Context, obj *db.UserMetaData) ([]*db.RideHistory, error) {
+	panic(fmt.Errorf("not implemented: RideHistory - rideHistory"))
+}
+
 type userMetaDataResolver struct{ *Resolver }

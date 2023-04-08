@@ -1,60 +1,59 @@
-directive @auth(type:Type!) on FIELD_DEFINITION
+directive @auth on FIELD_DEFINITION
 
-enum Type{
-    Client
-    Driver 
+enum Type {
+  Client
+  Driver
 }
 
 scalar Time
 
-type UserMetaData{
-    id: ID!
-    phoneNumber: String!
-    dateOfBirth: Time!
-    createdDate: Time!
+type UserMetaData {
+  id: ID!
+  phoneNumber: String!
+  dateOfBirth: Time!
+  createdDate: Time!
 }
 
-type Location{
-    lat: Float!
-    long: Float!
+type Location {
+  lat: Float!
+  long: Float!
 }
 
-type PaymentHistory{
-    id: ID!
-    amountCents: Int!
-    paymentMethod: String!
-    createdAt: Time!
+type PaymentHistory {
+  id: ID!
+  amountCents: Int!
+  paymentMethod: String!
+  createdAt: Time!
 }
 
-type RideHistory{
-    id: ID!
-    source: Location!
-    destination: Location!
-    user: String!
-    payment_id: PaymentHistory!
-    driver: Driver!
-    boardTime: Time!
-    arrivalTime: Time
-    status: String
+type RideHistory {
+  id: ID!
+  source: Location!
+  destination: Location!
+  user: String!
+  payment_id: PaymentHistory!
+  driver: Driver!
+  boardTime: Time!
+  arrivalTime: Time
+  status: String
 }
 
-type Session{
-    user: UserMetaData
-    isSigupComplete: Boolean!
+type Session {
+  user: UserMetaData
+  isSigupComplete: Boolean!
 }
 
-
-input CreateUserData{ 
-    phoneNumber: String!
-    dateOfBirth: Time!
-    firebaseAuthId: String!
+input CreateUserData {
+  phoneNumber: String!
+  dateOfBirth: Time!
+  firebaseAuthId: String!
 }
 
-type Mutation{
-     createUser(data: CreateUserData!): UserMetaData!
-     createSession(tokenId: String!): Session!
+type Mutation {
+  createUser(data: CreateUserData!): UserMetaData!
+  createSession(tokenId: String!): Session!
 }
 
-type Query{
-    userMetaData(id: ID!): UserMetaData!
+type Query {
+  userMetaData(id: ID!): UserMetaData! @auth()
 }

@@ -42,11 +42,10 @@ type ResolverRoot interface {
 	Mutation() MutationResolver
 	Query() QueryResolver
 	RideHistory() RideHistoryResolver
-	UserMetaData() UserMetaDataResolver
 }
 
 type DirectiveRoot struct {
-	Auth func(ctx context.Context, obj interface{}, next graphql.Resolver, typeArg model.Type) (res interface{}, err error)
+	Auth func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -105,7 +104,6 @@ type ComplexityRoot struct {
 		DateOfBirth func(childComplexity int) int
 		ID          func(childComplexity int) int
 		PhoneNumber func(childComplexity int) int
-		RideHistory func(childComplexity int) int
 	}
 }
 
@@ -124,9 +122,6 @@ type RideHistoryResolver interface {
 
 	PaymentID(ctx context.Context, obj *db.RideHistory) (*db.PaymentHistory, error)
 	Driver(ctx context.Context, obj *db.RideHistory) (*db.Driver, error)
-}
-type UserMetaDataResolver interface {
-	RideHistory(ctx context.Context, obj *db.UserMetaData) ([]*db.RideHistory, error)
 }
 
 type executableSchema struct {
@@ -400,13 +395,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.UserMetaData.PhoneNumber(childComplexity), true
 
-	case "UserMetaData.rideHistory":
-		if e.complexity.UserMetaData.RideHistory == nil {
-			break
-		}
-
-		return e.complexity.UserMetaData.RideHistory(childComplexity), true
-
 	}
 	return 0, false
 }
@@ -495,21 +483,6 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
-
-func (ec *executionContext) dir_auth_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 model.Type
-	if tmp, ok := rawArgs["type"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("type"))
-		arg0, err = ec.unmarshalNType2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐType(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["type"] = arg0
-	return args, nil
-}
 
 func (ec *executionContext) field_Mutation_createDriver_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -1079,8 +1052,6 @@ func (ec *executionContext) fieldContext_Mutation_createUser(ctx context.Context
 				return ec.fieldContext_UserMetaData_dateOfBirth(ctx, field)
 			case "createdDate":
 				return ec.fieldContext_UserMetaData_createdDate(ctx, field)
-			case "rideHistory":
-				return ec.fieldContext_UserMetaData_rideHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserMetaData", field.Name)
 		},
@@ -1420,8 +1391,28 @@ func (ec *executionContext) _Query_userMetaData(ctx context.Context, field graph
 		}
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().UserMetaData(rctx, fc.Args["id"].(string))
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Query().UserMetaData(rctx, fc.Args["id"].(string))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Auth == nil {
+				return nil, errors.New("directive auth is not implemented")
+			}
+			return ec.directives.Auth(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*db.UserMetaData); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *github.com/ghost-codes/uber/db/sqlc.UserMetaData`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1454,8 +1445,6 @@ func (ec *executionContext) fieldContext_Query_userMetaData(ctx context.Context,
 				return ec.fieldContext_UserMetaData_dateOfBirth(ctx, field)
 			case "createdDate":
 				return ec.fieldContext_UserMetaData_createdDate(ctx, field)
-			case "rideHistory":
-				return ec.fieldContext_UserMetaData_rideHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserMetaData", field.Name)
 		},
@@ -2146,8 +2135,6 @@ func (ec *executionContext) fieldContext_Session_user(ctx context.Context, field
 				return ec.fieldContext_UserMetaData_dateOfBirth(ctx, field)
 			case "createdDate":
 				return ec.fieldContext_UserMetaData_createdDate(ctx, field)
-			case "rideHistory":
-				return ec.fieldContext_UserMetaData_rideHistory(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserMetaData", field.Name)
 		},
@@ -2370,70 +2357,6 @@ func (ec *executionContext) fieldContext_UserMetaData_createdDate(ctx context.Co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Time does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _UserMetaData_rideHistory(ctx context.Context, field graphql.CollectedField, obj *db.UserMetaData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_UserMetaData_rideHistory(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.UserMetaData().RideHistory(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.([]*db.RideHistory)
-	fc.Result = res
-	return ec.marshalNRideHistory2ᚕᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋdbᚋsqlcᚐRideHistoryᚄ(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_UserMetaData_rideHistory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "UserMetaData",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_RideHistory_id(ctx, field)
-			case "source":
-				return ec.fieldContext_RideHistory_source(ctx, field)
-			case "destination":
-				return ec.fieldContext_RideHistory_destination(ctx, field)
-			case "user":
-				return ec.fieldContext_RideHistory_user(ctx, field)
-			case "payment_id":
-				return ec.fieldContext_RideHistory_payment_id(ctx, field)
-			case "driver":
-				return ec.fieldContext_RideHistory_driver(ctx, field)
-			case "boardTime":
-				return ec.fieldContext_RideHistory_boardTime(ctx, field)
-			case "arrivalTime":
-				return ec.fieldContext_RideHistory_arrivalTime(ctx, field)
-			case "status":
-				return ec.fieldContext_RideHistory_status(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type RideHistory", field.Name)
 		},
 	}
 	return fc, nil
@@ -4737,49 +4660,29 @@ func (ec *executionContext) _UserMetaData(ctx context.Context, sel ast.Selection
 			out.Values[i] = ec._UserMetaData_id(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
+				invalids++
 			}
 		case "phoneNumber":
 
 			out.Values[i] = ec._UserMetaData_phoneNumber(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
+				invalids++
 			}
 		case "dateOfBirth":
 
 			out.Values[i] = ec._UserMetaData_dateOfBirth(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
+				invalids++
 			}
 		case "createdDate":
 
 			out.Values[i] = ec._UserMetaData_createdDate(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
+				invalids++
 			}
-		case "rideHistory":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._UserMetaData_rideHistory(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5231,60 +5134,6 @@ func (ec *executionContext) marshalNPaymentHistory2ᚖgithubᚗcomᚋghostᚑcod
 	return ec._PaymentHistory(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNRideHistory2ᚕᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋdbᚋsqlcᚐRideHistoryᚄ(ctx context.Context, sel ast.SelectionSet, v []*db.RideHistory) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNRideHistory2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋdbᚋsqlcᚐRideHistory(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
-func (ec *executionContext) marshalNRideHistory2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋdbᚋsqlcᚐRideHistory(ctx context.Context, sel ast.SelectionSet, v *db.RideHistory) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._RideHistory(ctx, sel, v)
-}
-
 func (ec *executionContext) marshalNSession2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐSession(ctx context.Context, sel ast.SelectionSet, v model.Session) graphql.Marshaler {
 	return ec._Session(ctx, sel, &v)
 }
@@ -5327,16 +5176,6 @@ func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel as
 		}
 	}
 	return res
-}
-
-func (ec *executionContext) unmarshalNType2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐType(ctx context.Context, v interface{}) (model.Type, error) {
-	var res model.Type
-	err := res.UnmarshalGQL(v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNType2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐType(ctx context.Context, sel ast.SelectionSet, v model.Type) graphql.Marshaler {
-	return v
 }
 
 func (ec *executionContext) marshalNUserMetaData2githubᚗcomᚋghostᚑcodesᚋuberᚋdbᚋsqlcᚐUserMetaData(ctx context.Context, sel ast.SelectionSet, v db.UserMetaData) graphql.Marshaler {

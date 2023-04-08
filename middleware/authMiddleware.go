@@ -10,43 +10,45 @@ import (
 )
 
 const (
-    authorizationKey="Authorization"
-    authorizationBearerType="bearer"
-    userPayloadKey="client";
+	authorizationKey               = "Authorization"
+	authorizationBearerType        = "bearer"
+	UserPayloadKey                 = "user"
+	UserTypeClient          string = "client"
+	UserTypeKey                    = "userType"
 )
- 
-func AuthMiddleware(store db.Store,firebaseAuth *auth.Client) gin.HandlerFunc{
-    return func(ctx *gin.Context){
-        authorizationHeader := ctx.GetHeader(authorizationKey);
-        if len(authorizationHeader)==0{
-            ctx.Next();
-            return ;
-        }
-        fields:= strings.Fields(authorizationHeader)
-        
-        if len(fields)<2{
-            ctx.Next();
-            return;
-        }
 
-        if strings.ToLower(fields[0]) != authorizationBearerType{
-            ctx.Next();
-            return;
-        }
+func AuthMiddleware(store db.Store, firebaseAuth *auth.Client) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		authorizationHeader := ctx.GetHeader(authorizationKey)
+		if len(authorizationHeader) == 0 {
+			ctx.Next()
+			return
+		}
+		fields := strings.Fields(authorizationHeader)
 
-        token,err:=firebaseAuth.VerifyIDToken(ctx,fields[1]);
-        if err!=nil{
-            ctx.AbortWithError(http.StatusForbidden,err);
-            return;
-        }
-        user,err:=store.FetchUserMetaDataByID(ctx,token.UID);
-        if err!=nil{
-            ctx.AbortWithError(http.StatusForbidden,err);
-            return;
-        }
+		if len(fields) < 2 {
+			ctx.Next()
+			return
+		}
 
-        ctx.Set(userPayloadKey,user)
+		if strings.ToLower(fields[0]) != authorizationBearerType {
+			ctx.Next()
+			return
+		}
 
-        ctx.Next()
-    }
+		token, err := firebaseAuth.VerifyIDToken(ctx, fields[1])
+		if err != nil {
+			ctx.AbortWithError(http.StatusForbidden, err)
+			return
+		}
+		user, err := store.FetchUserMetaDataByID(ctx, token.UID)
+		if err != nil {
+			ctx.AbortWithError(http.StatusForbidden, err)
+			return
+		}
+
+		ctx.Set(UserPayloadKey, user)
+
+		ctx.Next()
+	}
 }
