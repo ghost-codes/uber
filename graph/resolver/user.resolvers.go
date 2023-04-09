@@ -94,14 +94,19 @@ func (r *rideHistoryResolver) Destination(ctx context.Context, obj *db.RideHisto
 	panic(fmt.Errorf("not implemented: Destination - destination"))
 }
 
-// PaymentID is the resolver for the payment_id field.
-func (r *rideHistoryResolver) PaymentID(ctx context.Context, obj *db.RideHistory) (*db.PaymentHistory, error) {
-	panic(fmt.Errorf("not implemented: PaymentID - payment_id"))
+// Payment is the resolver for the payment field.
+func (r *rideHistoryResolver) Payment(ctx context.Context, obj *db.RideHistory) (*db.PaymentHistory, error) {
+	panic(fmt.Errorf("not implemented: Payment - payment"))
 }
 
 // Driver is the resolver for the driver field.
 func (r *rideHistoryResolver) Driver(ctx context.Context, obj *db.RideHistory) (*db.Driver, error) {
 	panic(fmt.Errorf("not implemented: Driver - driver"))
+}
+
+// User is the resolver for the user field.
+func (r *rideHistoryResolver) User(ctx context.Context, obj *db.RideHistory) (*db.UserMetaData, error) {
+	panic(fmt.Errorf("not implemented: User - user"))
 }
 
 // Mutation returns graph.MutationResolver implementation.
@@ -123,6 +128,9 @@ type rideHistoryResolver struct{ *Resolver }
 //   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
 //     it when you're done.
 //   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *rideHistoryResolver) PaymentID(ctx context.Context, obj *db.RideHistory) (*db.PaymentHistory, error) {
+	panic(fmt.Errorf("not implemented: PaymentID - payment_id"))
+}
 func (r *userMetaDataResolver) RideHistory(ctx context.Context, obj *db.UserMetaData) ([]*db.RideHistory, error) {
 	panic(fmt.Errorf("not implemented: RideHistory - rideHistory"))
 }

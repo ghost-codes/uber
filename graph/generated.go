@@ -88,7 +88,7 @@ type ComplexityRoot struct {
 		Destination func(childComplexity int) int
 		Driver      func(childComplexity int) int
 		ID          func(childComplexity int) int
-		PaymentID   func(childComplexity int) int
+		Payment     func(childComplexity int) int
 		Source      func(childComplexity int) int
 		Status      func(childComplexity int) int
 		User        func(childComplexity int) int
@@ -119,9 +119,9 @@ type QueryResolver interface {
 type RideHistoryResolver interface {
 	Source(ctx context.Context, obj *db.RideHistory) (*model.Location, error)
 	Destination(ctx context.Context, obj *db.RideHistory) (*model.Location, error)
-
-	PaymentID(ctx context.Context, obj *db.RideHistory) (*db.PaymentHistory, error)
+	Payment(ctx context.Context, obj *db.RideHistory) (*db.PaymentHistory, error)
 	Driver(ctx context.Context, obj *db.RideHistory) (*db.Driver, error)
+	User(ctx context.Context, obj *db.RideHistory) (*db.UserMetaData, error)
 }
 
 type executableSchema struct {
@@ -325,12 +325,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RideHistory.ID(childComplexity), true
 
-	case "RideHistory.payment_id":
-		if e.complexity.RideHistory.PaymentID == nil {
+	case "RideHistory.payment":
+		if e.complexity.RideHistory.Payment == nil {
 			break
 		}
 
-		return e.complexity.RideHistory.PaymentID(childComplexity), true
+		return e.complexity.RideHistory.Payment(childComplexity), true
 
 	case "RideHistory.source":
 		if e.complexity.RideHistory.Source == nil {
@@ -1807,8 +1807,8 @@ func (ec *executionContext) fieldContext_RideHistory_destination(ctx context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _RideHistory_user(ctx context.Context, field graphql.CollectedField, obj *db.RideHistory) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RideHistory_user(ctx, field)
+func (ec *executionContext) _RideHistory_payment(ctx context.Context, field graphql.CollectedField, obj *db.RideHistory) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RideHistory_payment(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -1821,51 +1821,7 @@ func (ec *executionContext) _RideHistory_user(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RideHistory_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RideHistory",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RideHistory_payment_id(ctx context.Context, field graphql.CollectedField, obj *db.RideHistory) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RideHistory_payment_id(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.RideHistory().PaymentID(rctx, obj)
+		return ec.resolvers.RideHistory().Payment(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1882,7 +1838,7 @@ func (ec *executionContext) _RideHistory_payment_id(ctx context.Context, field g
 	return ec.marshalNPaymentHistory2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋdbᚋsqlcᚐPaymentHistory(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_RideHistory_payment_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_RideHistory_payment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "RideHistory",
 		Field:      field,
@@ -1960,6 +1916,60 @@ func (ec *executionContext) fieldContext_RideHistory_driver(ctx context.Context,
 				return ec.fieldContext_Driver_profilePicture(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Driver", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RideHistory_user(ctx context.Context, field graphql.CollectedField, obj *db.RideHistory) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RideHistory_user(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.RideHistory().User(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*db.UserMetaData)
+	fc.Result = res
+	return ec.marshalNUserMetaData2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋdbᚋsqlcᚐUserMetaData(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RideHistory_user(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RideHistory",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_UserMetaData_id(ctx, field)
+			case "phoneNumber":
+				return ec.fieldContext_UserMetaData_phoneNumber(ctx, field)
+			case "dateOfBirth":
+				return ec.fieldContext_UserMetaData_dateOfBirth(ctx, field)
+			case "createdDate":
+				return ec.fieldContext_UserMetaData_createdDate(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserMetaData", field.Name)
 		},
 	}
 	return fc, nil
@@ -4540,14 +4550,7 @@ func (ec *executionContext) _RideHistory(ctx context.Context, sel ast.SelectionS
 				return innerFunc(ctx)
 
 			})
-		case "user":
-
-			out.Values[i] = ec._RideHistory_user(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
-		case "payment_id":
+		case "payment":
 			field := field
 
 			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
@@ -4556,7 +4559,7 @@ func (ec *executionContext) _RideHistory(ctx context.Context, sel ast.SelectionS
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._RideHistory_payment_id(ctx, field, obj)
+				res = ec._RideHistory_payment(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}
@@ -4577,6 +4580,26 @@ func (ec *executionContext) _RideHistory(ctx context.Context, sel ast.SelectionS
 					}
 				}()
 				res = ec._RideHistory_driver(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "user":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._RideHistory_user(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}

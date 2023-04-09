@@ -30,9 +30,9 @@ type RideHistory {
   id: ID!
   source: Location!
   destination: Location!
-  user: String!
-  payment_id: PaymentHistory!
+  payment: PaymentHistory!
   driver: Driver!
+  user: UserMetaData!
   boardTime: Time!
   arrivalTime: Time
   status: String
