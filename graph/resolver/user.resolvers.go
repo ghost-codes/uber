@@ -7,11 +7,16 @@ package graph
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"log"
 
 	db "github.com/ghost-codes/uber/db/sqlc"
 	"github.com/ghost-codes/uber/graph"
 	"github.com/ghost-codes/uber/graph/model"
+	"github.com/ghost-codes/uber/kafkaConfig"
+	"github.com/golang/geo/s2"
+	"github.com/segmentio/kafka-go"
 )
 
 // CreateUser is the resolver for the createUser field.
@@ -55,7 +60,7 @@ func (r *mutationResolver) CreateSession(ctx context.Context, tokenID string) (*
 		}
 
 		session := model.Session{
-			IsSigupComplete: false,
+			IsSignupComplete: false,
 		}
 
 		return &session, nil
@@ -71,8 +76,8 @@ func (r *mutationResolver) CreateSession(ctx context.Context, tokenID string) (*
 	}
 
 	session := model.Session{
-		IsSigupComplete: true,
-		User:            &user,
+		IsSignupComplete: true,
+		User:             &user,
 	}
 
 	return &session, nil
@@ -109,6 +114,62 @@ func (r *rideHistoryResolver) User(ctx context.Context, obj *db.RideHistory) (*d
 	panic(fmt.Errorf("not implemented: User - user"))
 }
 
+// DriverLocations is the resolver for the driverLocations field.
+func (r *subscriptionResolver) DriverLocations(ctx context.Context, location *model.UserLocation) (<-chan []*model.CarLocation, error) {
+    latLng := s2.LatLngFromDegrees(location.Lat,location.Lng);
+
+    //Convert latlont to cellID
+    tempCellID := s2.CellIDFromLatLng(latLng);
+
+    //Get cellID at level 8;
+    cellID := tempCellID.Parent(10);
+
+    ch := make(chan []*model.CarLocation)
+    fmt.Println("CellID")
+    fmt.Println(tempCellID)
+    fmt.Println(cellID);
+    go func (){
+        drivers := make(map[int64]*model.CarLocation)
+        readerConfig:= kafkaconfig.NewKafkaReaderConfig("driver-location",[]string{r.Config.KafkaHost});
+
+        reader:= kafka.NewReader(readerConfig)
+        defer reader.Close()
+
+        for{
+            message, err := reader.ReadMessage(context.Background())
+            if err != nil {
+                log.Println("Error reading message:", err)
+                break
+            }
+
+
+            var  loc *model.CarLocation
+            e:=json.Unmarshal(message.Value,&loc)
+            
+            if e!=nil{
+                fmt.Println(e);
+                return;
+            }
+
+            drivers[loc.Driver.ID] = loc;
+            fmt.Println(loc.Location.Long)
+            list_drivers := []*model.CarLocation{}
+            for _,v:=range drivers{
+                list_drivers = append(list_drivers,v)
+            }
+            select{
+            case ch<- list_drivers:
+                fmt.Println("Send")
+            }
+
+            close(ch)
+        }
+    }();
+
+
+    return ch,nil;
+}
+
 // Mutation returns graph.MutationResolver implementation.
 func (r *Resolver) Mutation() graph.MutationResolver { return &mutationResolver{r} }
 
@@ -118,9 +179,13 @@ func (r *Resolver) Query() graph.QueryResolver { return &queryResolver{r} }
 // RideHistory returns graph.RideHistoryResolver implementation.
 func (r *Resolver) RideHistory() graph.RideHistoryResolver { return &rideHistoryResolver{r} }
 
+// Subscription returns graph.SubscriptionResolver implementation.
+func (r *Resolver) Subscription() graph.SubscriptionResolver { return &subscriptionResolver{r} }
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type rideHistoryResolver struct{ *Resolver }
+type subscriptionResolver struct{ *Resolver }
 
 // !!! WARNING !!!
 // The code below was going to be deleted when updating resolvers. It has been copied here so you have

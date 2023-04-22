@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"database/sql"
 	"net/http"
 	"strings"
 
@@ -43,6 +44,10 @@ func AuthMiddleware(store db.Store, firebaseAuth *auth.Client) gin.HandlerFunc {
 		}
 		user, err := store.FetchUserMetaDataByID(ctx, token.UID)
 		if err != nil {
+            if err == sql.ErrNoRows{
+                ctx.Next();
+                return;
+            }
 			ctx.AbortWithError(http.StatusForbidden, err)
 			return
 		}

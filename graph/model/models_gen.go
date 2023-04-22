@@ -11,6 +11,12 @@ import (
 	db "github.com/ghost-codes/uber/db/sqlc"
 )
 
+type CarLocation struct {
+	Location *Location  `json:"location"`
+	Driver   *db.Driver `json:"driver"`
+	CarType  CarType    `json:"carType"`
+}
+
 type CreateUserData struct {
 	PhoneNumber    string    `json:"phoneNumber"`
 	DateOfBirth    time.Time `json:"dateOfBirth"`
@@ -23,8 +29,54 @@ type Location struct {
 }
 
 type Session struct {
-	User            *db.UserMetaData `json:"user,omitempty"`
-	IsSigupComplete bool             `json:"isSigupComplete"`
+	User             *db.UserMetaData `json:"user,omitempty"`
+	IsSignupComplete bool             `json:"isSignupComplete"`
+}
+
+type UserLocation struct {
+	Lat float64 `json:"lat"`
+	Lng float64 `json:"lng"`
+}
+
+type CarType string
+
+const (
+	CarTypeLuxury CarType = "luxury"
+	CarTypeFamily CarType = "family"
+)
+
+var AllCarType = []CarType{
+	CarTypeLuxury,
+	CarTypeFamily,
+}
+
+func (e CarType) IsValid() bool {
+	switch e {
+	case CarTypeLuxury, CarTypeFamily:
+		return true
+	}
+	return false
+}
+
+func (e CarType) String() string {
+	return string(e)
+}
+
+func (e *CarType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = CarType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid CarType", str)
+	}
+	return nil
+}
+
+func (e CarType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type Type string

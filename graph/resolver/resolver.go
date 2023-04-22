@@ -14,4 +14,5 @@ type Resolver struct{
     FirebaseAuth *auth.Client
     Store *db.Store
     Config util.Config
+
 }

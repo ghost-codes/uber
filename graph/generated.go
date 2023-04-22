@@ -8,6 +8,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -42,6 +43,7 @@ type ResolverRoot interface {
 	Mutation() MutationResolver
 	Query() QueryResolver
 	RideHistory() RideHistoryResolver
+	Subscription() SubscriptionResolver
 }
 
 type DirectiveRoot struct {
@@ -49,6 +51,12 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	CarLocation struct {
+		CarType  func(childComplexity int) int
+		Driver   func(childComplexity int) int
+		Location func(childComplexity int) int
+	}
+
 	Driver struct {
 		CarBrand       func(childComplexity int) int
 		CarColor       func(childComplexity int) int
@@ -95,8 +103,12 @@ type ComplexityRoot struct {
 	}
 
 	Session struct {
-		IsSigupComplete func(childComplexity int) int
-		User            func(childComplexity int) int
+		IsSignupComplete func(childComplexity int) int
+		User             func(childComplexity int) int
+	}
+
+	Subscription struct {
+		DriverLocations func(childComplexity int, location *model.UserLocation) int
 	}
 
 	UserMetaData struct {
@@ -123,6 +135,9 @@ type RideHistoryResolver interface {
 	Driver(ctx context.Context, obj *db.RideHistory) (*db.Driver, error)
 	User(ctx context.Context, obj *db.RideHistory) (*db.UserMetaData, error)
 }
+type SubscriptionResolver interface {
+	DriverLocations(ctx context.Context, location *model.UserLocation) (<-chan []*model.CarLocation, error)
+}
 
 type executableSchema struct {
 	resolvers  ResolverRoot
@@ -138,6 +153,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	ec := executionContext{nil, e}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "CarLocation.carType":
+		if e.complexity.CarLocation.CarType == nil {
+			break
+		}
+
+		return e.complexity.CarLocation.CarType(childComplexity), true
+
+	case "CarLocation.driver":
+		if e.complexity.CarLocation.Driver == nil {
+			break
+		}
+
+		return e.complexity.CarLocation.Driver(childComplexity), true
+
+	case "CarLocation.location":
+		if e.complexity.CarLocation.Location == nil {
+			break
+		}
+
+		return e.complexity.CarLocation.Location(childComplexity), true
 
 	case "Driver.carBrand":
 		if e.complexity.Driver.CarBrand == nil {
@@ -353,12 +389,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RideHistory.User(childComplexity), true
 
-	case "Session.isSigupComplete":
-		if e.complexity.Session.IsSigupComplete == nil {
+	case "Session.isSignupComplete":
+		if e.complexity.Session.IsSignupComplete == nil {
 			break
 		}
 
-		return e.complexity.Session.IsSigupComplete(childComplexity), true
+		return e.complexity.Session.IsSignupComplete(childComplexity), true
 
 	case "Session.user":
 		if e.complexity.Session.User == nil {
@@ -366,6 +402,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Session.User(childComplexity), true
+
+	case "Subscription.driverLocations":
+		if e.complexity.Subscription.DriverLocations == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_driverLocations_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.DriverLocations(childComplexity, args["location"].(*model.UserLocation)), true
 
 	case "UserMetaData.createdDate":
 		if e.complexity.UserMetaData.CreatedDate == nil {
@@ -404,6 +452,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	ec := executionContext{rc, e}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputCreateUserData,
+		ec.unmarshalInputUserLocation,
 	)
 	first := true
 
@@ -432,6 +481,23 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
 			data := ec._Mutation(ctx, rc.Operation.SelectionSet)
 			var buf bytes.Buffer
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
+	case ast.Subscription:
+		next := ec._Subscription(ctx, rc.Operation.SelectionSet)
+
+		var buf bytes.Buffer
+		return func(ctx context.Context) *graphql.Response {
+			buf.Reset()
+			data := next(ctx)
+
+			if data == nil {
+				return nil
+			}
 			data.MarshalGQL(&buf)
 
 			return &graphql.Response{
@@ -574,6 +640,21 @@ func (ec *executionContext) field_Query_userMetaData_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Subscription_driverLocations_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *model.UserLocation
+	if tmp, ok := rawArgs["location"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("location"))
+		arg0, err = ec.unmarshalOUserLocation2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐUserLocation(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["location"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field___Type_enumValues_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -611,6 +692,160 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _CarLocation_location(ctx context.Context, field graphql.CollectedField, obj *model.CarLocation) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CarLocation_location(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Location, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Location)
+	fc.Result = res
+	return ec.marshalNLocation2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐLocation(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CarLocation_location(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CarLocation",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "lat":
+				return ec.fieldContext_Location_lat(ctx, field)
+			case "long":
+				return ec.fieldContext_Location_long(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Location", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CarLocation_driver(ctx context.Context, field graphql.CollectedField, obj *model.CarLocation) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CarLocation_driver(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Driver, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*db.Driver)
+	fc.Result = res
+	return ec.marshalNDriver2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋdbᚋsqlcᚐDriver(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CarLocation_driver(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CarLocation",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Driver_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Driver_name(ctx, field)
+			case "contact":
+				return ec.fieldContext_Driver_contact(ctx, field)
+			case "carNumber":
+				return ec.fieldContext_Driver_carNumber(ctx, field)
+			case "carBrand":
+				return ec.fieldContext_Driver_carBrand(ctx, field)
+			case "carColor":
+				return ec.fieldContext_Driver_carColor(ctx, field)
+			case "profilePicture":
+				return ec.fieldContext_Driver_profilePicture(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Driver", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CarLocation_carType(ctx context.Context, field graphql.CollectedField, obj *model.CarLocation) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CarLocation_carType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CarType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.CarType)
+	fc.Result = res
+	return ec.marshalNCarType2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCarType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CarLocation_carType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CarLocation",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type CarType does not have child fields")
+		},
+	}
+	return fc, nil
+}
 
 func (ec *executionContext) _Driver_id(ctx context.Context, field graphql.CollectedField, obj *db.Driver) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Driver_id(ctx, field)
@@ -1111,8 +1346,8 @@ func (ec *executionContext) fieldContext_Mutation_createSession(ctx context.Cont
 			switch field.Name {
 			case "user":
 				return ec.fieldContext_Session_user(ctx, field)
-			case "isSigupComplete":
-				return ec.fieldContext_Session_isSigupComplete(ctx, field)
+			case "isSignupComplete":
+				return ec.fieldContext_Session_isSignupComplete(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Session", field.Name)
 		},
@@ -2152,8 +2387,8 @@ func (ec *executionContext) fieldContext_Session_user(ctx context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _Session_isSigupComplete(ctx context.Context, field graphql.CollectedField, obj *model.Session) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Session_isSigupComplete(ctx, field)
+func (ec *executionContext) _Session_isSignupComplete(ctx context.Context, field graphql.CollectedField, obj *model.Session) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Session_isSignupComplete(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -2166,7 +2401,7 @@ func (ec *executionContext) _Session_isSigupComplete(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.IsSigupComplete, nil
+		return obj.IsSignupComplete, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2183,7 +2418,7 @@ func (ec *executionContext) _Session_isSigupComplete(ctx context.Context, field 
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Session_isSigupComplete(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Session_isSignupComplete(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Session",
 		Field:      field,
@@ -2192,6 +2427,83 @@ func (ec *executionContext) fieldContext_Session_isSigupComplete(ctx context.Con
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_driverLocations(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	fc, err := ec.fieldContext_Subscription_driverLocations(ctx, field)
+	if err != nil {
+		return nil
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = nil
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Subscription().DriverLocations(rctx, fc.Args["location"].(*model.UserLocation))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return nil
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return nil
+	}
+	return func(ctx context.Context) graphql.Marshaler {
+		select {
+		case res, ok := <-resTmp.(<-chan []*model.CarLocation):
+			if !ok {
+				return nil
+			}
+			return graphql.WriterFunc(func(w io.Writer) {
+				w.Write([]byte{'{'})
+				graphql.MarshalString(field.Alias).MarshalGQL(w)
+				w.Write([]byte{':'})
+				ec.marshalNCarLocation2ᚕᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCarLocationᚄ(ctx, field.Selections, res).MarshalGQL(w)
+				w.Write([]byte{'}'})
+			})
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (ec *executionContext) fieldContext_Subscription_driverLocations(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "location":
+				return ec.fieldContext_CarLocation_location(ctx, field)
+			case "driver":
+				return ec.fieldContext_CarLocation_driver(ctx, field)
+			case "carType":
+				return ec.fieldContext_CarLocation_carType(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CarLocation", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_driverLocations_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -4189,6 +4501,42 @@ func (ec *executionContext) unmarshalInputCreateUserData(ctx context.Context, ob
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputUserLocation(ctx context.Context, obj interface{}) (model.UserLocation, error) {
+	var it model.UserLocation
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"lat", "lng"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "lat":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lat"))
+			it.Lat, err = ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "lng":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lng"))
+			it.Lng, err = ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -4196,6 +4544,48 @@ func (ec *executionContext) unmarshalInputCreateUserData(ctx context.Context, ob
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
+
+var carLocationImplementors = []string{"CarLocation"}
+
+func (ec *executionContext) _CarLocation(ctx context.Context, sel ast.SelectionSet, obj *model.CarLocation) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, carLocationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CarLocation")
+		case "location":
+
+			out.Values[i] = ec._CarLocation_location(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "driver":
+
+			out.Values[i] = ec._CarLocation_driver(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "carType":
+
+			out.Values[i] = ec._CarLocation_carType(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
 
 var driverImplementors = []string{"Driver"}
 
@@ -4650,9 +5040,9 @@ func (ec *executionContext) _Session(ctx context.Context, sel ast.SelectionSet, 
 
 			out.Values[i] = ec._Session_user(ctx, field, obj)
 
-		case "isSigupComplete":
+		case "isSignupComplete":
 
-			out.Values[i] = ec._Session_isSigupComplete(ctx, field, obj)
+			out.Values[i] = ec._Session_isSignupComplete(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
@@ -4666,6 +5056,26 @@ func (ec *executionContext) _Session(ctx context.Context, sel ast.SelectionSet, 
 		return graphql.Null
 	}
 	return out
+}
+
+var subscriptionImplementors = []string{"Subscription"}
+
+func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, subscriptionImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Subscription",
+	})
+	if len(fields) != 1 {
+		ec.Errorf(ctx, "must subscribe to exactly one stream")
+		return nil
+	}
+
+	switch fields[0].Name {
+	case "driverLocations":
+		return ec._Subscription_driverLocations(ctx, fields[0])
+	default:
+		panic("unknown field " + strconv.Quote(fields[0].Name))
+	}
 }
 
 var userMetaDataImplementors = []string{"UserMetaData"}
@@ -5048,6 +5458,70 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNCarLocation2ᚕᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCarLocationᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CarLocation) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNCarLocation2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCarLocation(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNCarLocation2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCarLocation(ctx context.Context, sel ast.SelectionSet, v *model.CarLocation) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CarLocation(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNCarType2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCarType(ctx context.Context, v interface{}) (model.CarType, error) {
+	var res model.CarType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNCarType2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCarType(ctx context.Context, sel ast.SelectionSet, v model.CarType) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNCreateUserData2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCreateUserData(ctx context.Context, v interface{}) (model.CreateUserData, error) {
@@ -5534,6 +6008,14 @@ func (ec *executionContext) marshalOTime2ᚖtimeᚐTime(ctx context.Context, sel
 	}
 	res := graphql.MarshalTime(*v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOUserLocation2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐUserLocation(ctx context.Context, v interface{}) (*model.UserLocation, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputUserLocation(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalOUserMetaData2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋdbᚋsqlcᚐUserMetaData(ctx context.Context, sel ast.SelectionSet, v *db.UserMetaData) graphql.Marshaler {

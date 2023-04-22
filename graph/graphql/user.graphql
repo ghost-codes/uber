@@ -35,18 +35,36 @@ type RideHistory {
   user: UserMetaData!
   boardTime: Time!
   arrivalTime: Time
-  status: String
+  status:String
 }
 
 type Session {
   user: UserMetaData
-  isSigupComplete: Boolean!
+  isSignupComplete: Boolean!
+}
+
+
+enum CarType{luxury,family}
+
+type CarLocation{
+    location: Location!
+    driver: Driver!
+    carType: CarType!
 }
 
 input CreateUserData {
   phoneNumber: String!
   dateOfBirth: Time!
   firebaseAuthId: String!
+}
+
+input UserLocation{
+    lat: Float!
+    lng: Float!
+}
+
+type Subscription{
+    driverLocations(location: UserLocation): [CarLocation!]!
 }
 
 type Mutation {

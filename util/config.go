@@ -6,6 +6,7 @@ type Config struct{
     DBDriver string `mapstructure:"DB_DRIVER"`
     DBSource string `mapstructure:"DB_SOURCE"`
     FirebaseConfigPath string `mapstructure:"FIREBASE_CONFIG_PATH"`
+    KafkaHost string `mapstructure:"KAFKA_HOST"`
 }
 
 
