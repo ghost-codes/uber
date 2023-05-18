@@ -9,6 +9,11 @@ type Driver {
   profilePicture: String
 }
 
+type DriverSession {
+  driver: Driver!
+  accessToken: String!
+}
+
 input CreateDriverInput {
   name: String!
   contact: String!
@@ -20,7 +25,7 @@ input CreateDriverInput {
 }
 
 extend type Mutation {
-  createDriver(data: CreateDriverInput!): Driver!
+  createDriver(data: CreateDriverInput!): DriverSession!
   updateCabLocation(data: UserLocation!): String
 }
 

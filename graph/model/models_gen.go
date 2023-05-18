@@ -33,6 +33,11 @@ type CreateUserData struct {
 	FirebaseAuthID string    `json:"firebaseAuthId"`
 }
 
+type DriverSession struct {
+	Driver      *db.Driver `json:"driver"`
+	AccessToken string     `json:"accessToken"`
+}
+
 type Location struct {
 	Lat  float64 `json:"lat"`
 	Long float64 `json:"long"`

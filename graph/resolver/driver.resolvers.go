@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	db "github.com/ghost-codes/uber/db/sqlc"
 	"github.com/ghost-codes/uber/graph/model"
@@ -19,7 +20,7 @@ import (
 )
 
 // CreateDriver is the resolver for the createDriver field.
-func (r *mutationResolver) CreateDriver(ctx context.Context, data model.CreateDriverInput) (*db.Driver, error) {
+func (r *mutationResolver) CreateDriver(ctx context.Context, data model.CreateDriverInput) (*model.DriverSession, error) {
 	hashedPassword, err := util.HashPassword(data.Password)
 
 	if err != nil {
@@ -41,8 +42,18 @@ func (r *mutationResolver) CreateDriver(ctx context.Context, data model.CreateDr
 	if err != nil {
 		return nil, err
 	}
+	// create access token
+	accessToken, _, err := r.Maker.CreateToken(driver.Name, 3000*time.Hour)
+	if err != nil {
+		return nil, err
+	}
 
-	return &driver, nil
+	result := model.DriverSession{
+		Driver:      &driver,
+		AccessToken: accessToken,
+	}
+
+	return &result, nil
 }
 
 // UpdateCabLocation is the resolver for the updateCabLocation field.
