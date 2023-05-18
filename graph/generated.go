@@ -62,6 +62,7 @@ type ComplexityRoot struct {
 		CarColor       func(childComplexity int) int
 		CarNumber      func(childComplexity int) int
 		Contact        func(childComplexity int) int
+		Email          func(childComplexity int) int
 		ID             func(childComplexity int) int
 		Name           func(childComplexity int) int
 		ProfilePicture func(childComplexity int) int
@@ -73,9 +74,10 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CreateDriver  func(childComplexity int, data model.CreateUserData) int
-		CreateSession func(childComplexity int, tokenID string) int
-		CreateUser    func(childComplexity int, data model.CreateUserData) int
+		CreateDriver      func(childComplexity int, data model.CreateDriverInput) int
+		CreateSession     func(childComplexity int, tokenID string) int
+		CreateUser        func(childComplexity int, data model.CreateUserData) int
+		UpdateCabLocation func(childComplexity int, data model.UserLocation) int
 	}
 
 	PaymentHistory struct {
@@ -122,7 +124,8 @@ type ComplexityRoot struct {
 type MutationResolver interface {
 	CreateUser(ctx context.Context, data model.CreateUserData) (*db.UserMetaData, error)
 	CreateSession(ctx context.Context, tokenID string) (*model.Session, error)
-	CreateDriver(ctx context.Context, data model.CreateUserData) (*db.Driver, error)
+	CreateDriver(ctx context.Context, data model.CreateDriverInput) (*db.Driver, error)
+	UpdateCabLocation(ctx context.Context, data model.UserLocation) (*string, error)
 }
 type QueryResolver interface {
 	UserMetaData(ctx context.Context, id string) (*db.UserMetaData, error)
@@ -203,6 +206,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Driver.Contact(childComplexity), true
 
+	case "Driver.email":
+		if e.complexity.Driver.Email == nil {
+			break
+		}
+
+		return e.complexity.Driver.Email(childComplexity), true
+
 	case "Driver.id":
 		if e.complexity.Driver.ID == nil {
 			break
@@ -248,7 +258,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateDriver(childComplexity, args["data"].(model.CreateUserData)), true
+		return e.complexity.Mutation.CreateDriver(childComplexity, args["data"].(model.CreateDriverInput)), true
 
 	case "Mutation.createSession":
 		if e.complexity.Mutation.CreateSession == nil {
@@ -273,6 +283,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.CreateUser(childComplexity, args["data"].(model.CreateUserData)), true
+
+	case "Mutation.updateCabLocation":
+		if e.complexity.Mutation.UpdateCabLocation == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateCabLocation_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdateCabLocation(childComplexity, args["data"].(model.UserLocation)), true
 
 	case "PaymentHistory.amountCents":
 		if e.complexity.PaymentHistory.AmountCents == nil {
@@ -451,6 +473,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	rc := graphql.GetOperationContext(ctx)
 	ec := executionContext{rc, e}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputCreateDriverInput,
 		ec.unmarshalInputCreateUserData,
 		ec.unmarshalInputUserLocation,
 	)
@@ -553,10 +576,10 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 func (ec *executionContext) field_Mutation_createDriver_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 model.CreateUserData
+	var arg0 model.CreateDriverInput
 	if tmp, ok := rawArgs["data"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("data"))
-		arg0, err = ec.unmarshalNCreateUserData2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCreateUserData(ctx, tmp)
+		arg0, err = ec.unmarshalNCreateDriverInput2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCreateDriverInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -587,6 +610,21 @@ func (ec *executionContext) field_Mutation_createUser_args(ctx context.Context, 
 	if tmp, ok := rawArgs["data"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("data"))
 		arg0, err = ec.unmarshalNCreateUserData2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCreateUserData(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["data"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateCabLocation_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 model.UserLocation
+	if tmp, ok := rawArgs["data"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("data"))
+		arg0, err = ec.unmarshalNUserLocation2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐUserLocation(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -788,6 +826,8 @@ func (ec *executionContext) fieldContext_CarLocation_driver(ctx context.Context,
 				return ec.fieldContext_Driver_name(ctx, field)
 			case "contact":
 				return ec.fieldContext_Driver_contact(ctx, field)
+			case "email":
+				return ec.fieldContext_Driver_email(ctx, field)
 			case "carNumber":
 				return ec.fieldContext_Driver_carNumber(ctx, field)
 			case "carBrand":
@@ -967,6 +1007,50 @@ func (ec *executionContext) _Driver_contact(ctx context.Context, field graphql.C
 }
 
 func (ec *executionContext) fieldContext_Driver_contact(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Driver",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Driver_email(ctx context.Context, field graphql.CollectedField, obj *db.Driver) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Driver_email(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Email, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Driver_email(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Driver",
 		Field:      field,
@@ -1380,7 +1464,7 @@ func (ec *executionContext) _Mutation_createDriver(ctx context.Context, field gr
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateDriver(rctx, fc.Args["data"].(model.CreateUserData))
+		return ec.resolvers.Mutation().CreateDriver(rctx, fc.Args["data"].(model.CreateDriverInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1411,6 +1495,8 @@ func (ec *executionContext) fieldContext_Mutation_createDriver(ctx context.Conte
 				return ec.fieldContext_Driver_name(ctx, field)
 			case "contact":
 				return ec.fieldContext_Driver_contact(ctx, field)
+			case "email":
+				return ec.fieldContext_Driver_email(ctx, field)
 			case "carNumber":
 				return ec.fieldContext_Driver_carNumber(ctx, field)
 			case "carBrand":
@@ -1431,6 +1517,58 @@ func (ec *executionContext) fieldContext_Mutation_createDriver(ctx context.Conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_createDriver_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateCabLocation(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_updateCabLocation(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().UpdateCabLocation(rctx, fc.Args["data"].(model.UserLocation))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateCabLocation(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateCabLocation_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -1743,6 +1881,8 @@ func (ec *executionContext) fieldContext_Query_fetchDriver(ctx context.Context, 
 				return ec.fieldContext_Driver_name(ctx, field)
 			case "contact":
 				return ec.fieldContext_Driver_contact(ctx, field)
+			case "email":
+				return ec.fieldContext_Driver_email(ctx, field)
 			case "carNumber":
 				return ec.fieldContext_Driver_carNumber(ctx, field)
 			case "carBrand":
@@ -2141,6 +2281,8 @@ func (ec *executionContext) fieldContext_RideHistory_driver(ctx context.Context,
 				return ec.fieldContext_Driver_name(ctx, field)
 			case "contact":
 				return ec.fieldContext_Driver_contact(ctx, field)
+			case "email":
+				return ec.fieldContext_Driver_email(ctx, field)
 			case "carNumber":
 				return ec.fieldContext_Driver_carNumber(ctx, field)
 			case "carBrand":
@@ -4457,6 +4599,82 @@ func (ec *executionContext) fieldContext___Type_specifiedByURL(ctx context.Conte
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputCreateDriverInput(ctx context.Context, obj interface{}) (model.CreateDriverInput, error) {
+	var it model.CreateDriverInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"name", "contact", "email", "password", "carNumber", "carBrand", "carColor"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "name":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			it.Name, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "contact":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("contact"))
+			it.Contact, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "email":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+			it.Email, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "password":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+			it.Password, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "carNumber":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("carNumber"))
+			it.CarNumber, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "carBrand":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("carBrand"))
+			it.CarBrand, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "carColor":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("carColor"))
+			it.CarColor, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateUserData(ctx context.Context, obj interface{}) (model.CreateUserData, error) {
 	var it model.CreateUserData
 	asMap := map[string]interface{}{}
@@ -4618,6 +4836,13 @@ func (ec *executionContext) _Driver(ctx context.Context, sel ast.SelectionSet, o
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "email":
+
+			out.Values[i] = ec._Driver_email(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "carNumber":
 
 			out.Values[i] = ec._Driver_carNumber(ctx, field, obj)
@@ -4735,6 +4960,12 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "updateCabLocation":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateCabLocation(ctx, field)
+			})
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5524,6 +5755,11 @@ func (ec *executionContext) marshalNCarType2githubᚗcomᚋghostᚑcodesᚋuber�
 	return v
 }
 
+func (ec *executionContext) unmarshalNCreateDriverInput2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCreateDriverInput(ctx context.Context, v interface{}) (model.CreateDriverInput, error) {
+	res, err := ec.unmarshalInputCreateDriverInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateUserData2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐCreateUserData(ctx context.Context, v interface{}) (model.CreateUserData, error) {
 	res, err := ec.unmarshalInputCreateUserData(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -5673,6 +5909,11 @@ func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel as
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNUserLocation2githubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐUserLocation(ctx context.Context, v interface{}) (model.UserLocation, error) {
+	res, err := ec.unmarshalInputUserLocation(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNUserMetaData2githubᚗcomᚋghostᚑcodesᚋuberᚋdbᚋsqlcᚐUserMetaData(ctx context.Context, sel ast.SelectionSet, v db.UserMetaData) graphql.Marshaler {

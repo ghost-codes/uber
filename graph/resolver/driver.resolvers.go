@@ -6,15 +6,117 @@ package graph
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
+	"log"
 
 	db "github.com/ghost-codes/uber/db/sqlc"
 	"github.com/ghost-codes/uber/graph/model"
+	"github.com/ghost-codes/uber/util"
+	"github.com/golang/geo/s2"
+	kafka "github.com/segmentio/kafka-go"
 )
 
 // CreateDriver is the resolver for the createDriver field.
-func (r *mutationResolver) CreateDriver(ctx context.Context, data model.CreateUserData) (*db.Driver, error) {
-	panic(fmt.Errorf("not implemented: CreateDriver - createDriver"))
+func (r *mutationResolver) CreateDriver(ctx context.Context, data model.CreateDriverInput) (*db.Driver, error) {
+	hashedPassword, err := util.HashPassword(data.Password)
+
+	if err != nil {
+		return nil, err
+	}
+
+	args := db.CreateDriverParams{
+		Name:           data.Name,
+		CarNumber:      data.CarNumber,
+		CarColor:       data.CarColor,
+		Contact:        data.Contact,
+		CarBrand:       data.CarBrand,
+		HashedPassword: hashedPassword,
+		Email:          data.Email,
+	}
+
+	driver, err := r.Store.CreateDriver(ctx, args)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &driver, nil
+}
+
+// UpdateCabLocation is the resolver for the updateCabLocation field.
+func (r *mutationResolver) UpdateCabLocation(ctx context.Context, data model.UserLocation) (*string, error) {
+	driver := int64(1)
+	args := db.UpdateCabLocationParams{
+		Driver:  driver,
+		Point:   data.Lat,
+		Point_2: data.Lng,
+	}
+
+	_, err := r.Store.GetCabLocation(ctx, driver)
+	cell_id := s2.LatLngFromDegrees(data.Lat, data.Lng)
+
+	writeConfig := kafka.WriterConfig{
+		Brokers:  []string{r.Config.KafkaHost},
+		Topic:    "driver-location",
+		Balancer: &kafka.LeastBytes{},
+	}
+
+	writer := kafka.NewWriter(writeConfig)
+	defer writer.Close()
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			createArgs := db.CreateCabLocationParams{
+				Driver:    driver,
+				CellID:    cell_id.String(),
+				Point:     data.Lat,
+				Point_2:   data.Lng,
+				Available: true,
+			}
+			if err != nil {
+				return nil, err
+			}
+			cabLocation, err := r.Store.CreateCabLocation(ctx, createArgs)
+			location := model.CarLocation{
+				Location: &model.Location{
+					Lat:  cabLocation.Position.(*model.Location).Lat,
+					Long: cabLocation.Position.(*model.Location).Long,
+				},
+				CarType: model.CarTypeLuxury,
+				Driver: &db.Driver{
+					ID: int64(12),
+				},
+			}
+
+			g, err := json.Marshal(location)
+
+			if err != nil {
+				log.Println(err)
+			}
+
+			kafkaMessage := kafka.Message{
+				Value: g,
+			}
+			err = writer.WriteMessages(context.Background(), kafkaMessage)
+
+			if err != nil {
+				return nil, err
+			}
+		}
+		return nil, err
+	}
+
+	_, err = r.Store.UpdateCabLocation(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+
+	// Send driver to pool for ui update and listening
+
+	message := "Successfully updated location"
+	return &message, nil
 }
 
 // FetchDriver is the resolver for the fetchDriver field.

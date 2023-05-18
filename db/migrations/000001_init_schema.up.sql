@@ -37,6 +37,8 @@ CREATE TABLE "pendingRide" (
 CREATE TABLE "driver" (
   "id" bigserial PRIMARY KEY,
   "name" varchar NOT NULL,
+  "email" varchar NOT NULL,
+  "hashed_password" varchar NOT NULL,
   "contact" varchar NOT NULL,
   "car_number" varchar NOT NULL,
   "car_brand" varchar NOT NULL,

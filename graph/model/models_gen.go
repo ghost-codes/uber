@@ -17,6 +17,16 @@ type CarLocation struct {
 	CarType  CarType    `json:"carType"`
 }
 
+type CreateDriverInput struct {
+	Name      string `json:"name"`
+	Contact   string `json:"contact"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	CarNumber string `json:"carNumber"`
+	CarBrand  string `json:"carBrand"`
+	CarColor  string `json:"carColor"`
+}
+
 type CreateUserData struct {
 	PhoneNumber    string    `json:"phoneNumber"`
 	DateOfBirth    time.Time `json:"dateOfBirth"`

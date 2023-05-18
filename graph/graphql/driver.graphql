@@ -1,18 +1,29 @@
-type Driver{
-    id: ID!
-    name: String!
-    contact: String!
-    carNumber: String!
-    carBrand: String!
-    carColor: String!
-    profilePicture: String
+type Driver {
+  id: ID!
+  name: String!
+  contact: String!
+  email: String!
+  carNumber: String!
+  carBrand: String!
+  carColor: String!
+  profilePicture: String
 }
 
-
-extend type Mutation{
-     createDriver(data: CreateUserData!): Driver!
+input CreateDriverInput {
+  name: String!
+  contact: String!
+  email: String!
+  password: String!
+  carNumber: String!
+  carBrand: String!
+  carColor: String!
 }
 
-extend type Query{
-    fetchDriver(id: ID!): Driver!
+extend type Mutation {
+  createDriver(data: CreateDriverInput!): Driver!
+  updateCabLocation(data: UserLocation!): String
+}
+
+extend type Query {
+  fetchDriver(id: ID!): Driver!
 }

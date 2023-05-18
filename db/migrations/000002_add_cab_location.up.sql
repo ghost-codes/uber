@@ -3,8 +3,9 @@ CREATE TABLE "cabLocation" (
   "driver" bigint NOT NULL,
   "cell_id" varchar NOT NULL,
   "position" point NOT NULL,
+  "available" boolean NOT NULL DEFAULT false,
   "created_at" timestamptz DEFAULT (now()),
   "updated_at" timestamptz DEFAULT (now())
 );
 
-ALTER TABLE "cabLocation" ADD FOREIGN KEY ("driver") REFERENCES "driver" ("id");
+ALTER TABLE "cabLocation" ADD FOREIGN KEY ("driver") REFERENCES "driver" ("id"); 
