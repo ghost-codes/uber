@@ -34,8 +34,9 @@ type CreateUserData struct {
 }
 
 type DriverSession struct {
-	Driver      *db.Driver `json:"driver"`
-	AccessToken string     `json:"accessToken"`
+	Driver       *db.Driver `json:"driver"`
+	AccessToken  string     `json:"accessToken"`
+	RefreshToken string     `json:"refreshToken"`
 }
 
 type Location struct {

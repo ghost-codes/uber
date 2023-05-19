@@ -7,13 +7,18 @@ package graph
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
-	"time"
+	"math"
+	"strconv"
+	"strings"
 
 	db "github.com/ghost-codes/uber/db/sqlc"
+	"github.com/ghost-codes/uber/graph/directives"
 	"github.com/ghost-codes/uber/graph/model"
+	"github.com/ghost-codes/uber/token"
 	"github.com/ghost-codes/uber/util"
 	"github.com/golang/geo/s2"
 	kafka "github.com/segmentio/kafka-go"
@@ -42,84 +47,88 @@ func (r *mutationResolver) CreateDriver(ctx context.Context, data model.CreateDr
 	if err != nil {
 		return nil, err
 	}
-	// create access token
-	accessToken, _, err := r.Maker.CreateToken(driver.Name, 3000*time.Hour)
+
+	return createSession(r.Maker, r.Config, driver)
+}
+
+// CreateDriverSession is the resolver for the createDriverSession field.
+func (r *mutationResolver) CreateDriverSession(ctx context.Context, email string, password string) (*model.DriverSession, error) {
+	driver, err := r.Store.GetDriverByEmail(ctx, email)
+
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("Invalid credentials")
+		}
 		return nil, err
 	}
 
-	result := model.DriverSession{
-		Driver:      &driver,
-		AccessToken: accessToken,
+	err = util.CheckPassword(password, driver.HashedPassword)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid credentials")
 	}
 
-	return &result, nil
+	return createSession(r.Maker, r.Config, driver)
 }
 
 // UpdateCabLocation is the resolver for the updateCabLocation field.
 func (r *mutationResolver) UpdateCabLocation(ctx context.Context, data model.UserLocation) (*string, error) {
-	driver := int64(1)
+	ginCtx, err := util.GinContextFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	payload, ok := ginCtx.Get(directives.DriverPayloadKey)
+	if !ok {
+		return nil, fmt.Errorf("Internal Server Error")
+	}
+
+	driverPayload := payload.(*token.Payload)
+	if driverPayload == nil {
+		return nil, fmt.Errorf("Internal Server Error")
+	}
 	args := db.UpdateCabLocationParams{
-		Driver:  driver,
+		Driver:  driverPayload.DriverID,
 		Point:   data.Lat,
 		Point_2: data.Lng,
 	}
 
-	_, err := r.Store.GetCabLocation(ctx, driver)
-	cell_id := s2.LatLngFromDegrees(data.Lat, data.Lng)
+	driver, err := r.Store.GetDriverByEmail(ctx, driverPayload.Email)
 
-	writeConfig := kafka.WriterConfig{
-		Brokers:  []string{r.Config.KafkaHost},
-		Topic:    "driver-location",
-		Balancer: &kafka.LeastBytes{},
+	if err != nil {
+		return nil, err
 	}
 
-	writer := kafka.NewWriter(writeConfig)
-	defer writer.Close()
+	_, err = r.Store.GetCabLocation(ctx, driverPayload.DriverID)
+	cell_id := s2.LatLngFromDegrees(data.Lat, data.Lng)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
 			createArgs := db.CreateCabLocationParams{
-				Driver:    driver,
+				Driver:    driverPayload.DriverID,
 				CellID:    cell_id.String(),
 				Point:     data.Lat,
 				Point_2:   data.Lng,
 				Available: true,
 			}
-			if err != nil {
-				return nil, err
-			}
+
 			cabLocation, err := r.Store.CreateCabLocation(ctx, createArgs)
-			location := model.CarLocation{
-				Location: &model.Location{
-					Lat:  cabLocation.Position.(*model.Location).Lat,
-					Long: cabLocation.Position.(*model.Location).Long,
-				},
-				CarType: model.CarTypeLuxury,
-				Driver: &db.Driver{
-					ID: int64(12),
-				},
-			}
-
-			g, err := json.Marshal(location)
-
-			if err != nil {
-				log.Println(err)
-			}
-
-			kafkaMessage := kafka.Message{
-				Value: g,
-			}
-			err = writer.WriteMessages(context.Background(), kafkaMessage)
-
 			if err != nil {
 				return nil, err
 			}
+			err = sendCarLocationkafkaEvent(cabLocation, r.Config.KafkaHost, &driver)
+			if err != nil {
+				return nil, err
+			}
+
 		}
 		return nil, err
 	}
 
-	_, err = r.Store.UpdateCabLocation(ctx, args)
+	cabLocation, err := r.Store.UpdateCabLocation(ctx, args)
+	if err != nil {
+		return nil, err
+	}
+
+	err = sendCarLocationkafkaEvent(cabLocation, r.Config.KafkaHost, &driver)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +139,95 @@ func (r *mutationResolver) UpdateCabLocation(ctx context.Context, data model.Use
 	return &message, nil
 }
 
+func sendCarLocationkafkaEvent(cabLocation db.CabLocation, kafkaHost string, driver *db.Driver) error {
+	writeConfig := kafka.WriterConfig{
+		Brokers:  []string{kafkaHost},
+		Topic:    "driver-location",
+		Balancer: &kafka.LeastBytes{},
+	}
+
+	writer := kafka.NewWriter(writeConfig)
+	defer writer.Close()
+
+	loca, err := ConvertByteTolocation(cabLocation.Position.([]byte))
+	if err != nil {
+		return fmt.Errorf("Something went wrong: %s", err.Error())
+	}
+
+	location := model.CarLocation{
+		Location: loca,
+		CarType:  model.CarTypeLuxury,
+		Driver:   driver,
+	}
+	fmt.Println(location.Location)
+
+	g, err := json.Marshal(location)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	kafkaMessage := kafka.Message{
+		Value: g,
+	}
+	err = writer.WriteMessages(context.Background(), kafkaMessage)
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func ConvertByteTolocation(s []byte) (*model.Location, error) {
+	fields := strings.Split(strings.ReplaceAll(strings.ReplaceAll(string(s), "(", ""), ")", ""), ",")
+	lat, err := strconv.Atoi(fields[0])
+	if err != nil {
+		return nil, err
+	}
+	lng, err := strconv.Atoi(fields[1])
+	if err != nil {
+		return nil, err
+	}
+	return &model.Location{
+		Lat:  float64(lat),
+		Long: float64(lng),
+	}, nil
+}
+
+func Float64frombytes(bytes []byte) float64 {
+	bits := binary.LittleEndian.Uint64(bytes)
+	float := math.Float64frombits(bits)
+	return float
+}
+
 // FetchDriver is the resolver for the fetchDriver field.
 func (r *queryResolver) FetchDriver(ctx context.Context, id string) (*db.Driver, error) {
 	panic(fmt.Errorf("not implemented: FetchDriver - fetchDriver"))
+}
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+func createSession(maker token.Maker, config util.Config, driver db.Driver) (*model.DriverSession, error) {
+	// create access token
+	accessToken, _, err := maker.CreateToken(driver.Email, driver.ID, config.AccessTokenDuration)
+	if err != nil {
+		return nil, err
+	}
+	// create access token
+	refreshToken, _, err := maker.CreateToken(driver.Email, driver.ID, config.RefreshTokenDuration)
+	if err != nil {
+		return nil, err
+	}
+	//TODO: Create Session
+
+	return &model.DriverSession{
+		Driver:       &driver,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
+
 }

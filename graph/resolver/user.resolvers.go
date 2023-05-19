@@ -122,21 +122,23 @@ func (r *subscriptionResolver) DriverLocations(ctx context.Context, location *mo
 	tempCellID := s2.CellIDFromLatLng(latLng)
 
 	//Get cellID at level 8;
-	cellID := tempCellID.Parent(10)
+	// cellID := tempCellID.Parent(10)
 
 	ch := make(chan []*model.CarLocation)
 	fmt.Println("CellID")
 	fmt.Println(tempCellID)
-	fmt.Println(cellID)
+	// fmt.Println(cellID)
 	go func() {
 		drivers := make(map[int64]*model.CarLocation)
 		readerConfig := kafkaconfig.NewKafkaReaderConfig("driver-location", []string{r.Config.KafkaHost})
 
 		reader := kafka.NewReader(readerConfig)
 		defer reader.Close()
+		list_drivers := []*model.CarLocation{}
 
 		for {
 			message, err := reader.ReadMessage(context.Background())
+
 			if err != nil {
 				log.Println("Error reading message:", err)
 				break
@@ -144,6 +146,7 @@ func (r *subscriptionResolver) DriverLocations(ctx context.Context, location *mo
 
 			var loc *model.CarLocation
 			e := json.Unmarshal(message.Value, &loc)
+			fmt.Println(loc)
 
 			if e != nil {
 				fmt.Println(e)
@@ -152,17 +155,16 @@ func (r *subscriptionResolver) DriverLocations(ctx context.Context, location *mo
 
 			drivers[loc.Driver.ID] = loc
 			fmt.Println(loc.Location.Long)
-			list_drivers := []*model.CarLocation{}
 			for _, v := range drivers {
 				list_drivers = append(list_drivers, v)
 			}
 			select {
 			case ch <- list_drivers:
 				fmt.Println("Send")
-			}
 
-			close(ch)
+			}
 		}
+
 	}()
 
 	return ch, nil

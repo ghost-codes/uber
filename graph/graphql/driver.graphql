@@ -1,3 +1,4 @@
+
 type Driver {
   id: ID!
   name: String!
@@ -9,9 +10,12 @@ type Driver {
   profilePicture: String
 }
 
+directive @authenticate on FIELD_DEFINITION
+
 type DriverSession {
   driver: Driver!
   accessToken: String!
+  refreshToken: String!
 }
 
 input CreateDriverInput {
@@ -26,7 +30,8 @@ input CreateDriverInput {
 
 extend type Mutation {
   createDriver(data: CreateDriverInput!): DriverSession!
-  updateCabLocation(data: UserLocation!): String
+  createDriverSession(email: String!, password: String!): DriverSession!
+  updateCabLocation(data: UserLocation!): String @authenticate()
 }
 
 extend type Query {

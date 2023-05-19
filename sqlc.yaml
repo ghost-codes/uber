@@ -64,10 +64,14 @@ overrides:
     go_type:
       type: "float64"
       pointer: true
-    nullable: true      
+    nullable: true
   - db_type: "pg_catalog.varchar"
     go_type:
       type: "string"
       pointer: true
-    nullable: true      
-
+    nullable: true
+  - db_type: "pg_catalog.point"
+    go_type:
+      type: "[]int"
+      pointer: true
+    nullable: true

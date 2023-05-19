@@ -15,8 +15,8 @@ type JWTMaker struct {
 }
 
 // create and sign new token for user
-func (jwtMaker *JWTMaker) CreateToken(username string, duration time.Duration) (string, *Payload, error) {
-	payload, err := NewPayload(username, duration)
+func (jwtMaker *JWTMaker) CreateToken(email string, driver_id int64, duration time.Duration) (string, *Payload, error) {
+	payload, err := NewPayload(email, driver_id, duration)
 	if err != nil {
 
 		return "", payload, err

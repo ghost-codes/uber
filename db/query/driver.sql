@@ -9,3 +9,7 @@ INSERT INTO "driver"(
   car_color
 ) VALUES ($1,$2,$3,$4,$5,$6,$7)
 RETURNING *;
+
+-- name: GetDriverByEmail :one
+SELECT * FROM "driver"
+WHERE email = $1;

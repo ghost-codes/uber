@@ -47,7 +47,8 @@ type ResolverRoot interface {
 }
 
 type DirectiveRoot struct {
-	Auth func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	Auth         func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
+	Authenticate func(ctx context.Context, obj interface{}, next graphql.Resolver) (res interface{}, err error)
 }
 
 type ComplexityRoot struct {
@@ -69,8 +70,9 @@ type ComplexityRoot struct {
 	}
 
 	DriverSession struct {
-		AccessToken func(childComplexity int) int
-		Driver      func(childComplexity int) int
+		AccessToken  func(childComplexity int) int
+		Driver       func(childComplexity int) int
+		RefreshToken func(childComplexity int) int
 	}
 
 	Location struct {
@@ -79,10 +81,11 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CreateDriver      func(childComplexity int, data model.CreateDriverInput) int
-		CreateSession     func(childComplexity int, tokenID string) int
-		CreateUser        func(childComplexity int, data model.CreateUserData) int
-		UpdateCabLocation func(childComplexity int, data model.UserLocation) int
+		CreateDriver        func(childComplexity int, data model.CreateDriverInput) int
+		CreateDriverSession func(childComplexity int, email string, password string) int
+		CreateSession       func(childComplexity int, tokenID string) int
+		CreateUser          func(childComplexity int, data model.CreateUserData) int
+		UpdateCabLocation   func(childComplexity int, data model.UserLocation) int
 	}
 
 	PaymentHistory struct {
@@ -130,6 +133,7 @@ type MutationResolver interface {
 	CreateUser(ctx context.Context, data model.CreateUserData) (*db.UserMetaData, error)
 	CreateSession(ctx context.Context, tokenID string) (*model.Session, error)
 	CreateDriver(ctx context.Context, data model.CreateDriverInput) (*model.DriverSession, error)
+	CreateDriverSession(ctx context.Context, email string, password string) (*model.DriverSession, error)
 	UpdateCabLocation(ctx context.Context, data model.UserLocation) (*string, error)
 }
 type QueryResolver interface {
@@ -253,6 +257,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.DriverSession.Driver(childComplexity), true
 
+	case "DriverSession.refreshToken":
+		if e.complexity.DriverSession.RefreshToken == nil {
+			break
+		}
+
+		return e.complexity.DriverSession.RefreshToken(childComplexity), true
+
 	case "Location.lat":
 		if e.complexity.Location.Lat == nil {
 			break
@@ -278,6 +289,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.CreateDriver(childComplexity, args["data"].(model.CreateDriverInput)), true
+
+	case "Mutation.createDriverSession":
+		if e.complexity.Mutation.CreateDriverSession == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createDriverSession_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreateDriverSession(childComplexity, args["email"].(string), args["password"].(string)), true
 
 	case "Mutation.createSession":
 		if e.complexity.Mutation.CreateSession == nil {
@@ -591,6 +614,30 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_createDriverSession_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["email"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["email"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["password"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["password"] = arg1
+	return args, nil
+}
 
 func (ec *executionContext) field_Mutation_createDriver_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -1361,6 +1408,50 @@ func (ec *executionContext) fieldContext_DriverSession_accessToken(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _DriverSession_refreshToken(ctx context.Context, field graphql.CollectedField, obj *model.DriverSession) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DriverSession_refreshToken(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RefreshToken, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DriverSession_refreshToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DriverSession",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Location_lat(ctx context.Context, field graphql.CollectedField, obj *model.Location) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Location_lat(ctx, field)
 	if err != nil {
@@ -1618,6 +1709,8 @@ func (ec *executionContext) fieldContext_Mutation_createDriver(ctx context.Conte
 				return ec.fieldContext_DriverSession_driver(ctx, field)
 			case "accessToken":
 				return ec.fieldContext_DriverSession_accessToken(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_DriverSession_refreshToken(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type DriverSession", field.Name)
 		},
@@ -1630,6 +1723,69 @@ func (ec *executionContext) fieldContext_Mutation_createDriver(ctx context.Conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_createDriver_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createDriverSession(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_createDriverSession(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().CreateDriverSession(rctx, fc.Args["email"].(string), fc.Args["password"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.DriverSession)
+	fc.Result = res
+	return ec.marshalNDriverSession2ᚖgithubᚗcomᚋghostᚑcodesᚋuberᚋgraphᚋmodelᚐDriverSession(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createDriverSession(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "driver":
+				return ec.fieldContext_DriverSession_driver(ctx, field)
+			case "accessToken":
+				return ec.fieldContext_DriverSession_accessToken(ctx, field)
+			case "refreshToken":
+				return ec.fieldContext_DriverSession_refreshToken(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DriverSession", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createDriverSession_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -1649,8 +1805,28 @@ func (ec *executionContext) _Mutation_updateCabLocation(ctx context.Context, fie
 		}
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().UpdateCabLocation(rctx, fc.Args["data"].(model.UserLocation))
+		directive0 := func(rctx context.Context) (interface{}, error) {
+			ctx = rctx // use context from middleware stack in children
+			return ec.resolvers.Mutation().UpdateCabLocation(rctx, fc.Args["data"].(model.UserLocation))
+		}
+		directive1 := func(ctx context.Context) (interface{}, error) {
+			if ec.directives.Authenticate == nil {
+				return nil, errors.New("directive authenticate is not implemented")
+			}
+			return ec.directives.Authenticate(ctx, nil, directive0)
+		}
+
+		tmp, err := directive1(rctx)
+		if err != nil {
+			return nil, graphql.ErrorOnPath(ctx, err)
+		}
+		if tmp == nil {
+			return nil, nil
+		}
+		if data, ok := tmp.(*string); ok {
+			return data, nil
+		}
+		return nil, fmt.Errorf(`unexpected type %T from directive, should be *string`, tmp)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5016,6 +5192,13 @@ func (ec *executionContext) _DriverSession(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "refreshToken":
+
+			out.Values[i] = ec._DriverSession_refreshToken(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5103,6 +5286,15 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createDriver(ctx, field)
+			})
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "createDriverSession":
+
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createDriverSession(ctx, field)
 			})
 
 			if out.Values[i] == graphql.Null {

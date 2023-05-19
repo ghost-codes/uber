@@ -56,3 +56,25 @@ func (q *Queries) CreateDriver(ctx context.Context, arg CreateDriverParams) (Dri
 	)
 	return i, err
 }
+
+const getDriverByEmail = `-- name: GetDriverByEmail :one
+SELECT id, name, email, hashed_password, contact, car_number, car_brand, car_color, profile_picture FROM "driver"
+WHERE email = $1
+`
+
+func (q *Queries) GetDriverByEmail(ctx context.Context, email string) (Driver, error) {
+	row := q.db.QueryRowContext(ctx, getDriverByEmail, email)
+	var i Driver
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.HashedPassword,
+		&i.Contact,
+		&i.CarNumber,
+		&i.CarBrand,
+		&i.CarColor,
+		&i.ProfilePicture,
+	)
+	return i, err
+}

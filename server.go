@@ -15,7 +15,6 @@ import (
 	"github.com/ghost-codes/uber/graph"
 	"github.com/ghost-codes/uber/graph/directives"
 	resolver "github.com/ghost-codes/uber/graph/resolver"
-	"github.com/ghost-codes/uber/middleware"
 	"github.com/ghost-codes/uber/token"
 	"github.com/ghost-codes/uber/util"
 	"github.com/gin-gonic/gin"
@@ -94,7 +93,7 @@ func main() {
 	// }()
 
 	router := gin.Default()
-	router.Use(middleware.AuthMiddleware(*store, auth))
+	// router.Use(middleware.AuthMiddleware(*store, auth))
 
 	router.Use(util.GinContextToContextMiddleware())
 	router.Any("/graphql", graphqlHandler(store, config, auth, maker))
@@ -115,7 +114,8 @@ func graphqlHandler(store *db.Store, config util.Config, auth *auth.Client, make
 		Maker:        maker,
 	},
 		Directives: graph.DirectiveRoot{
-			Auth: directives.UserAuthDirective,
+			Auth:         directives.UserAuthDirective,
+			Authenticate: directives.AuthenticateDriverfunc(maker),
 		},
 	}))
 
