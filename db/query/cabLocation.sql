@@ -17,7 +17,11 @@ RETURNING *;
 SELECT * FROM "cabLocation" 
 WHERE driver=$1;
 
+-- name: GetCabLocationForSubscription :many
+SELECT * FROM "cabLocation"
+WHERE cell_id = $1;
+
 -- name: ListCabLocation :many
 SELECT * FROM "cabLocation"
 WHERE   ST_DWithin(point($1 ,$2)::geography,
-              ST_MakePoint(long,lat),8046.72);;
+              ST_MakePoint(long,lat),8046.72);

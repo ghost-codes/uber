@@ -68,6 +68,42 @@ func (q *Queries) GetCabLocation(ctx context.Context, driver int64) (CabLocation
 	return i, err
 }
 
+const getCabLocationForSubscription = `-- name: GetCabLocationForSubscription :many
+SELECT id, driver, cell_id, position, available, created_at, updated_at FROM "cabLocation"
+WHERE cell_id = $1
+`
+
+func (q *Queries) GetCabLocationForSubscription(ctx context.Context, cellID string) ([]CabLocation, error) {
+	rows, err := q.db.QueryContext(ctx, getCabLocationForSubscription, cellID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CabLocation{}
+	for rows.Next() {
+		var i CabLocation
+		if err := rows.Scan(
+			&i.ID,
+			&i.Driver,
+			&i.CellID,
+			&i.Position,
+			&i.Available,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCabLocation = `-- name: ListCabLocation :many
 SELECT id, driver, cell_id, position, available, created_at, updated_at FROM "cabLocation"
 WHERE   ST_DWithin(point($1 ,$2)::geography,

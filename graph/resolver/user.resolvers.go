@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	db "github.com/ghost-codes/uber/db/sqlc"
 	"github.com/ghost-codes/uber/graph"
@@ -121,20 +122,33 @@ func (r *subscriptionResolver) DriverLocations(ctx context.Context, location *mo
 	//Convert latlont to cellID
 	tempCellID := s2.CellIDFromLatLng(latLng)
 
-	//Get cellID at level 8;
-	// cellID := tempCellID.Parent(10)
-
 	ch := make(chan []*model.CarLocation)
 	fmt.Println("CellID")
 	fmt.Println(tempCellID)
-	// fmt.Println(cellID)
+
+	// fetch initial data for cab locations
+	cabLocations, err := r.Store.GetCabLocationForSubscription(ctx, tempCellID.String())
+	if err != nil {
+		return nil, err
+	}
+
 	go func() {
+
+		// keeping track of drivers
 		drivers := make(map[int64]*model.CarLocation)
 		readerConfig := kafkaconfig.NewKafkaReaderConfig("driver-location", []string{r.Config.KafkaHost})
 
 		reader := kafka.NewReader(readerConfig)
 		defer reader.Close()
-		list_drivers := []*model.CarLocation{}
+		List_drivers := []*model.CarLocation{}
+
+		time.Sleep(1 * time.Second)
+		for _, cl := range cabLocations {
+			List_drivers = append(List_drivers, &model.CarLocation{
+				Driver: cl.Driver,
+				// Location: ,
+			})
+		}
 
 		for {
 			message, err := reader.ReadMessage(context.Background())
@@ -154,12 +168,13 @@ func (r *subscriptionResolver) DriverLocations(ctx context.Context, location *mo
 			}
 
 			drivers[loc.Driver.ID] = loc
+			list_of_drivers := []*model.CarLocation{}
 			fmt.Println(loc.Location.Long)
 			for _, v := range drivers {
-				list_drivers = append(list_drivers, v)
+				List_drivers = append(List_drivers, v)
 			}
 			select {
-			case ch <- list_drivers:
+			case ch <- list_of_drivers:
 				fmt.Println("Send")
 
 			}
@@ -193,11 +208,5 @@ type subscriptionResolver struct{ *Resolver }
 //   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
 //     it when you're done.
 //   - You have helper methods in this file. Move them out to keep these resolver files clean.
-func (r *rideHistoryResolver) PaymentID(ctx context.Context, obj *db.RideHistory) (*db.PaymentHistory, error) {
-	panic(fmt.Errorf("not implemented: PaymentID - payment_id"))
-}
-func (r *userMetaDataResolver) RideHistory(ctx context.Context, obj *db.UserMetaData) ([]*db.RideHistory, error) {
-	panic(fmt.Errorf("not implemented: RideHistory - rideHistory"))
-}
 
 type userMetaDataResolver struct{ *Resolver }

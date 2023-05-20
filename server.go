@@ -11,6 +11,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/ghost-codes/uber/dataloader"
 	db "github.com/ghost-codes/uber/db/sqlc"
 	"github.com/ghost-codes/uber/graph"
 	"github.com/ghost-codes/uber/graph/directives"
@@ -45,53 +46,6 @@ func main() {
 		log.Fatal("error unable to initialize token maker: ", err)
 	}
 
-	// writeConfig := kafka.WriterConfig{
-	//     Brokers: []string{config.KafkaHost},
-	//     Topic: "driver-location",
-	//     Balancer: &kafka.LeastBytes{},
-	// }
-
-	// writer:=kafka.NewWriter(writeConfig)
-	// defer writer.Close()
-
-	// go func(){
-	//     long:= 0.0;
-	//     for{
-	//         long=long+0.00001
-	//         location:=model.CarLocation{
-	//             Location: &model.Location{
-	//                 Lat:0.0,
-	//                 Long: long,
-	//             },
-	//             CarType: model.CarTypeLuxury,
-	//             Driver: &db.Driver{
-	//                 ID: int64(12),
-	//             },
-	//         }
-	//         g,err:=json.Marshal(location)
-
-	//         if err!=nil{
-	//             log.Println(err)
-	//             break;
-	//         }
-
-	//         kafkaMessage:=kafka.Message{
-	//             Value: g,
-	//         }
-	//         cerr:=writer.WriteMessages(context.Background(),kafkaMessage)
-
-	//         if err != nil {
-	//             fmt.Println("Error writing message:", cerr)
-	//         } else {
-	//             //fmt.Println("Wrote message:", kafkaMessage)
-	//         }
-
-	//     // Wait for one second before sending the next location update
-	//     time.Sleep(time.Second)
-	//     }
-
-	// }()
-
 	router := gin.Default()
 	// router.Use(middleware.AuthMiddleware(*store, auth))
 
@@ -107,11 +61,14 @@ func graphqlHandler(store *db.Store, config util.Config, auth *auth.Client, make
 	// NewExecutableSchema and Config are in the generated.go file
 	// Resolver is in the resolver.go file
 
+	dl := dataloader.NewRetriever()
+
 	srv := handler.New(graph.NewExecutableSchema(graph.Config{Resolvers: &resolver.Resolver{
 		Store:        store,
 		Config:       config,
 		FirebaseAuth: auth,
 		Maker:        maker,
+		DataLoaders:  dl,
 	},
 		Directives: graph.DirectiveRoot{
 			Auth:         directives.UserAuthDirective,

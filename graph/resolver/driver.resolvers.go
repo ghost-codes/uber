@@ -7,11 +7,9 @@ package graph
 import (
 	"context"
 	"database/sql"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"strconv"
 	"strings"
 
@@ -192,12 +190,6 @@ func ConvertByteTolocation(s []byte) (*model.Location, error) {
 		Lat:  float64(lat),
 		Long: float64(lng),
 	}, nil
-}
-
-func Float64frombytes(bytes []byte) float64 {
-	bits := binary.LittleEndian.Uint64(bytes)
-	float := math.Float64frombits(bits)
-	return float
 }
 
 // FetchDriver is the resolver for the fetchDriver field.
